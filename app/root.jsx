@@ -6,6 +6,9 @@ import {
   ScrollRestoration,
 } from "@remix-run/react";
 
+
+import '@shopify/polaris/build/esm/styles.css';
+
 export default function App() {
   return (
     <html>

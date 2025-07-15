@@ -3,7 +3,7 @@
 client_id = "664d98faa9f5f747da25aa32ef554211"
 name = "smart-sticky"
 handle = "smart-sticky"
-application_url = "https://sri-yellow-definition-physiology.trycloudflare.com"
+application_url = "https://scenic-tv-atm-opt.trycloudflare.com"
 embedded = true
 
 [build]
@@ -26,7 +26,7 @@ api_version = "2025-07"
 scopes = "write_products"
 
 [auth]
-redirect_urls = ["https://sri-yellow-definition-physiology.trycloudflare.com/auth/callback", "https://sri-yellow-definition-physiology.trycloudflare.com/auth/shopify/callback", "https://sri-yellow-definition-physiology.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://scenic-tv-atm-opt.trycloudflare.com/auth/callback", "https://scenic-tv-atm-opt.trycloudflare.com/auth/shopify/callback", "https://scenic-tv-atm-opt.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

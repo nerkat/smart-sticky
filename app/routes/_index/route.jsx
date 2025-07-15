@@ -37,6 +37,11 @@ export default function Index() {
     alert("Saved!");
   };
 
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+
+  if (!hydrated) return null; // or spinner
+
   return (
     <div style={{ padding: "2rem" }}>
       <h1>Sticky Cart Bar Settings</h1>

@@ -3,7 +3,7 @@
 client_id = "664d98faa9f5f747da25aa32ef554211"
 name = "smart-sticky"
 handle = "smart-sticky"
-application_url = "https://exploration-instance-villages-input.trycloudflare.com"
+application_url = "https://glow-des-nothing-seek.trycloudflare.com"
 embedded = true
 
 [build]
@@ -26,7 +26,7 @@ api_version = "2025-07"
 scopes = "write_products"
 
 [auth]
-redirect_urls = ["https://exploration-instance-villages-input.trycloudflare.com/auth/callback", "https://exploration-instance-villages-input.trycloudflare.com/auth/shopify/callback", "https://exploration-instance-villages-input.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://glow-des-nothing-seek.trycloudflare.com/auth/callback", "https://glow-des-nothing-seek.trycloudflare.com/auth/shopify/callback", "https://glow-des-nothing-seek.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

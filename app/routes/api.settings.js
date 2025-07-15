@@ -1,11 +1,12 @@
 // app/routes/api.settings.js
 import { json } from "@remix-run/node";
 import { getSession } from "../shopify.server";
-import { prisma } from "../db.server";
+import prisma from "../db.server";
 
 
 export async function loader({ request }) {
-  const { session } = await getSession(request);
+  const isDev = process.env.NODE_ENV === "development";
+  const session = isDev ? { shop: "dev-shop.myshopify.com" } : (await getSession(request)).session;
   const url = new URL(request.url);
   const themeId = url.searchParams.get("themeId");
 

@@ -1,7 +1,8 @@
-// app/routes/api/sticky-settings.js
+// app/routes/api.settings.js
 import { json } from "@remix-run/node";
 import { getSession } from "../shopify.server";
 import { prisma } from "../db.server";
+
 
 export async function loader({ request }) {
   const { session } = await getSession(request);

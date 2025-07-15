@@ -8,7 +8,7 @@ export default function Index() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`/api/sticky-settings?themeId=${themeId}`)
+    fetch(`/api/settings?themeId=${themeId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.settings) {
@@ -21,7 +21,7 @@ export default function Index() {
   }, [themeId]);
 
   const save = async () => {
-    await fetch("/api/sticky-settings", {
+    await fetch("/api/settings", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

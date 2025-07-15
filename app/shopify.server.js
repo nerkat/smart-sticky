@@ -1,3 +1,5 @@
+// app/shopify.server.js
+
 import "@shopify/shopify-app-remix/adapters/node";
 import {
   ApiVersion,
@@ -7,6 +9,7 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 
+// Initialize Shopify app
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
@@ -25,6 +28,7 @@ const shopify = shopifyApp({
     : {}),
 });
 
+// Export required values
 export default shopify;
 export const apiVersion = ApiVersion.January25;
 export const addDocumentResponseHeaders = shopify.addDocumentResponseHeaders;
@@ -33,3 +37,9 @@ export const unauthenticated = shopify.unauthenticated;
 export const login = shopify.login;
 export const registerWebhooks = shopify.registerWebhooks;
 export const sessionStorage = shopify.sessionStorage;
+
+// 🔸 Add this:
+export async function getSession(request) {
+  const { session } = await shopify.authenticate.admin(request);
+  return { session };
+}

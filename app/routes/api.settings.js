@@ -25,7 +25,8 @@ export async function loader({ request }) {
 }
 
 export async function action({ request }) {
-  const { session } = await getSession(request);
+  const isDev = process.env.NODE_ENV === "development";
+  const session = isDev ? { shop: "dev-shop.myshopify.com" } : (await getSession(request)).session;
   const body = await request.json();
   const { themeId, enabled, position, offset } = body;
 

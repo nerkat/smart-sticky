@@ -3,7 +3,7 @@
 client_id = "664d98faa9f5f747da25aa32ef554211"
 name = "smart-sticky"
 handle = "smart-sticky"
-application_url = "https://glow-des-nothing-seek.trycloudflare.com"
+application_url = "https://successful-more-particle-marie.trycloudflare.com"
 embedded = true
 
 [build]
@@ -23,10 +23,10 @@ api_version = "2025-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products"
+scopes = "write_products,read_themes"
 
 [auth]
-redirect_urls = ["https://glow-des-nothing-seek.trycloudflare.com/auth/callback", "https://glow-des-nothing-seek.trycloudflare.com/auth/shopify/callback", "https://glow-des-nothing-seek.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://successful-more-particle-marie.trycloudflare.com/auth/callback", "https://successful-more-particle-marie.trycloudflare.com/auth/shopify/callback", "https://successful-more-particle-marie.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

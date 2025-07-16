@@ -27,7 +27,23 @@ export async function loader({ request }) {
 export async function action({ request }) {
   const isDev = process.env.NODE_ENV === "development";
   const session = isDev ? { shop: "dev-shop.myshopify.com" } : (await getSession(request)).session;
-  const body = await request.json();
+  
+  let body;
+  const contentType = request.headers.get("content-type");
+  
+  if (contentType && contentType.includes("application/json")) {
+    body = await request.json();
+  } else {
+    // Handle form data from Remix fetcher
+    const formData = await request.formData();
+    body = {
+      themeId: formData.get("themeId"),
+      enabled: formData.get("enabled") === "true",
+      position: formData.get("position"),
+      offset: Number(formData.get("offset")),
+    };
+  }
+  
   const { themeId, enabled, position, offset } = body;
 
   if (!themeId) return json({ error: "Missing themeId" }, { status: 400 });

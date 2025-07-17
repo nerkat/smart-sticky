@@ -41,7 +41,12 @@ export async function createScriptTag(admin, shop) {
     const existing = await getExistingScriptTag(shop);
     if (existing) {
       console.log(`ScriptTag already exists for shop ${shop}:`, existing.scriptTagId);
-      return existing;
+      // Update timestamp for existing ScriptTag
+      const updated = await prisma.scriptTag.update({
+        where: { shop },
+        data: { lastInstallAt: new Date() }
+      });
+      return updated;
     }
 
     // Create ScriptTag via GraphQL
@@ -90,12 +95,13 @@ export async function createScriptTag(admin, shop) {
 
     const scriptTagId = scriptTag.id.replace('gid://shopify/ScriptTag/', '');
 
-    // Save to database
+    // Save to database with install timestamp
     const saved = await prisma.scriptTag.create({
       data: {
         shop,
         scriptTagId,
-        src
+        src,
+        lastInstallAt: new Date()
       }
     });
 
@@ -206,6 +212,83 @@ export async function listScriptTags(admin) {
     return data.scriptTags.edges.map(edge => edge.node);
   } catch (error) {
     console.error('Error listing ScriptTags:', error);
+    throw error;
+  }
+}
+
+/**
+ * Force reinstall ScriptTag (delete and recreate)
+ */
+export async function forceReinstallScriptTag(admin, shop) {
+  try {
+    // First try to delete existing
+    try {
+      await deleteScriptTag(admin, shop);
+      console.log('Smart Sticky: Existing ScriptTag deleted for force reinstall');
+    } catch (deleteError) {
+      console.log('Smart Sticky: No existing ScriptTag to delete or deletion failed:', deleteError.message);
+    }
+    
+    // Wait a moment before recreating
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Create new one
+    const result = await createScriptTag(admin, shop);
+    console.log('Smart Sticky: ScriptTag force reinstalled successfully');
+    return result;
+  } catch (error) {
+    console.error('Error force reinstalling ScriptTag:', error);
+    throw error;
+  }
+}
+
+/**
+ * Revalidate ScriptTag (check if it exists in Shopify and recreate if missing)
+ */
+export async function revalidateScriptTag(admin, shop) {
+  try {
+    const localScriptTag = await getExistingScriptTag(shop);
+    if (!localScriptTag) {
+      console.log('Smart Sticky: No local ScriptTag found, creating new one');
+      return await createScriptTag(admin, shop);
+    }
+    
+    // Get all ScriptTags from Shopify
+    const allScriptTags = await listScriptTags(admin);
+    const expectedSrc = getScriptTagSrc();
+    
+    // Check if our ScriptTag exists in Shopify
+    const existsInShopify = allScriptTags.some(tag => 
+      tag.id.includes(localScriptTag.scriptTagId) || tag.src === expectedSrc
+    );
+    
+    if (!existsInShopify) {
+      console.log('Smart Sticky: ScriptTag not found in Shopify, recreating...');
+      // Remove from local DB and recreate
+      await prisma.scriptTag.delete({ where: { shop } });
+      return await createScriptTag(admin, shop);
+    }
+    
+    // Check if URL changed
+    const shopifyScriptTag = allScriptTags.find(tag => 
+      tag.id.includes(localScriptTag.scriptTagId)
+    );
+    
+    if (shopifyScriptTag && shopifyScriptTag.src !== expectedSrc) {
+      console.log('Smart Sticky: ScriptTag URL changed, updating...');
+      return await forceReinstallScriptTag(admin, shop);
+    }
+    
+    // Update timestamp for successful revalidation
+    const updated = await prisma.scriptTag.update({
+      where: { shop },
+      data: { lastInstallAt: new Date() }
+    });
+    
+    console.log('Smart Sticky: ScriptTag revalidated successfully');
+    return updated;
+  } catch (error) {
+    console.error('Error revalidating ScriptTag:', error);
     throw error;
   }
 }

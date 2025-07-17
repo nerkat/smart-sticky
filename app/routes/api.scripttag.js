@@ -1,7 +1,14 @@
 // app/routes/api.scripttag.js
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { createScriptTag, deleteScriptTag, getExistingScriptTag, listScriptTags } from "../services/scriptTag.server";
+import { 
+  createScriptTag, 
+  deleteScriptTag, 
+  getExistingScriptTag, 
+  listScriptTags,
+  forceReinstallScriptTag,
+  revalidateScriptTag
+} from "../services/scriptTag.server";
 
 export async function loader({ request }) {
   try {
@@ -72,6 +79,14 @@ export async function action({ request }) {
       case "uninstall": {
         const result = await deleteScriptTag(admin, session.shop);
         return json({ success: true, deleted: result });
+      }
+      case "force-reinstall": {
+        const result = await forceReinstallScriptTag(admin, session.shop);
+        return json({ success: true, scriptTag: result });
+      }
+      case "revalidate": {
+        const result = await revalidateScriptTag(admin, session.shop);
+        return json({ success: true, scriptTag: result });
       }
       default:
         return json({ error: "Invalid action" }, { status: 400 });

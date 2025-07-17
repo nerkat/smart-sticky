@@ -9,11 +9,18 @@ export async function loader({ request }) {
   if (window.smartStickyLoaded) return;
   window.smartStickyLoaded = true;
   
-  console.log('Smart Sticky: Loading sticky bar functionality');
+  console.log('StickyBar script initialized');
+  
+  // Only load on product pages
+  if (!window.location.pathname.includes('/products/')) {
+    console.log('Smart Sticky: Not a product page, skipping initialization');
+    return;
+  }
   
   // Configuration
   const config = {
-    selector: '[data-testid="add-to-cart-button"], .btn[data-action="add-to-cart"], button[name="add"], .product-form__cart-submit, .btn-product-form, .add-to-cart-button, .product-form--add-to-cart-button',
+    formSelector: 'form[action^="/cart/add"]',
+    buttonSelector: '[data-testid="add-to-cart-button"], .btn[data-action="add-to-cart"], button[name="add"], .product-form__cart-submit, .btn-product-form, .add-to-cart-button, .product-form--add-to-cart-button',
     offset: 100,
     position: 'bottom',
     backgroundColor: '#000',
@@ -22,23 +29,35 @@ export async function loader({ request }) {
     zIndex: 9999
   };
   
+  let originalForm = null;
   let originalButton = null;
   let stickyBar = null;
   let isVisible = false;
+  let mutationObserver = null;
   
-  // Find the original add to cart button
-  function findAddToCartButton() {
-    const selectors = config.selector.split(',').map(s => s.trim());
+  // Find the cart form and submit button
+  function findCartForm() {
+    const forms = document.querySelectorAll(config.formSelector);
+    for (const form of forms) {
+      const submitButton = form.querySelector('button[type="submit"], input[type="submit"]');
+      if (submitButton && form.offsetParent !== null) {
+        return { form, button: submitButton };
+      }
+    }
+    
+    // Fallback: look for standalone add to cart buttons
+    const selectors = config.buttonSelector.split(',').map(s => s.trim());
     for (const selector of selectors) {
       const button = document.querySelector(selector);
       if (button && button.offsetParent !== null) {
-        return button;
+        const form = button.closest('form');
+        return { form, button };
       }
     }
-    return null;
+    return { form: null, button: null };
   }
   
-  // Create sticky bar HTML
+  // Create sticky bar HTML with cloned form content
   function createStickyBar() {
     if (stickyBar) return stickyBar;
     
@@ -54,64 +73,134 @@ export async function loader({ request }) {
       padding: 15px 20px;
       z-index: \${config.zIndex};
       transform: translateY(\${config.position === 'bottom' ? '100%' : '-100%'});
-      transition: transform 0.3s ease-in-out;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+      transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+      box-shadow: 0 -2px 20px rgba(0,0,0,0.15);
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 15px;
+      backdrop-filter: blur(10px);
+      
+      @media (max-width: 768px) {
+        padding: 12px 16px;
+        gap: 12px;
+      }
     \`;
     
     // Get product info
     const productTitle = document.querySelector('.product-title, .product__title, h1')?.textContent?.trim() || 'Product';
     const productPrice = document.querySelector('.price, .product-price, .money')?.textContent?.trim() || '';
     
+    // Clone form content if available
+    let formContent = '';
+    if (originalForm) {
+      // Clone important form fields (variants, quantity, etc.)
+      const formClone = originalForm.cloneNode(true);
+      formClone.id = 'smart-sticky-form';
+      formClone.style.cssText = 'display: flex; align-items: center; gap: 10px; margin: 0;';
+      
+      // Hide non-essential elements in the cloned form
+      const elementsToHide = formClone.querySelectorAll('label, .product-description, .product-images, .product-reviews');
+      elementsToHide.forEach(el => el.style.display = 'none');
+      
+      // Style variant selectors and quantity inputs
+      const selects = formClone.querySelectorAll('select');
+      const inputs = formClone.querySelectorAll('input[type="number"], input[name="quantity"]');
+      
+      selects.forEach(select => {
+        select.style.cssText = 'padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; max-width: 120px;';
+      });
+      
+      inputs.forEach(input => {
+        input.style.cssText = 'padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; width: 60px;';
+      });
+      
+      formContent = formClone.outerHTML;
+    }
+    
     bar.innerHTML = \`
-      <div style="display: flex; align-items: center; gap: 15px; width: 100%; max-width: 1200px;">
-        <div style="flex: 1; min-width: 0;">
+      <div style="display: flex; align-items: center; gap: 15px; width: 100%; max-width: 1200px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 200px;">
           <div style="font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             \${productTitle}
           </div>
           \${productPrice ? \`<div style="font-size: 12px; opacity: 0.9;">\${productPrice}</div>\` : ''}
         </div>
-        <button id="smart-sticky-add-to-cart" style="
-          background: #fff;
-          color: #000;
-          border: none;
-          padding: 12px 24px;
-          border-radius: 4px;
-          font-weight: bold;
-          cursor: pointer;
-          font-size: 14px;
-          white-space: nowrap;
-          transition: all 0.2s ease;
-        " onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='#fff'">
-          \${config.buttonText}
-        </button>
+        \${formContent || ''}
+        \${!formContent ? \`
+          <button id="smart-sticky-add-to-cart" style="
+            background: #fff;
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 14px;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            min-width: 120px;
+          " onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='#fff'">
+            \${config.buttonText}
+          </button>
+        \` : ''}
       </div>
     \`;
     
     document.body.appendChild(bar);
     
-    // Add click handler
-    const stickyButton = bar.querySelector('#smart-sticky-add-to-cart');
-    stickyButton.addEventListener('click', function() {
-      if (originalButton) {
-        // Track the click
-        console.log('Smart Sticky: Add to cart clicked from sticky bar');
-        
-        // Trigger the original button click
-        originalButton.click();
-        
-        // Optional: scroll to original button
-        originalButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Add click handler for cloned form or fallback button
+    if (originalForm && formContent) {
+      const clonedForm = bar.querySelector('#smart-sticky-form');
+      if (clonedForm) {
+        clonedForm.addEventListener('submit', function(e) {
+          e.preventDefault();
+          console.log('Smart Sticky: Form submitted from sticky bar');
+          
+          // Copy form data to original form and submit
+          const formData = new FormData(clonedForm);
+          const originalFormData = new FormData(originalForm);
+          
+          // Update original form with sticky form data
+          for (const [key, value] of formData.entries()) {
+            const originalField = originalForm.querySelector(\`[name="\${key}"]\`);
+            if (originalField) {
+              if (originalField.type === 'checkbox' || originalField.type === 'radio') {
+                originalField.checked = value === originalField.value;
+              } else {
+                originalField.value = value;
+              }
+            }
+          }
+          
+          // Submit original form
+          if (originalButton) {
+            originalButton.click();
+          } else {
+            originalForm.submit();
+          }
+          
+          // Optional: scroll to original form
+          originalForm.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
       }
-    });
+    } else {
+      const stickyButton = bar.querySelector('#smart-sticky-add-to-cart');
+      if (stickyButton) {
+        stickyButton.addEventListener('click', function() {
+          if (originalButton) {
+            console.log('Smart Sticky: Add to cart clicked from sticky bar');
+            originalButton.click();
+            originalButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        });
+      }
+    }
     
     return bar;
   }
   
-  // Check if original button is visible
+  // Check if original element is visible
   function isElementVisible(element) {
     if (!element) return false;
     const rect = element.getBoundingClientRect();
@@ -121,9 +210,10 @@ export async function loader({ request }) {
   
   // Show/hide sticky bar
   function toggleStickyBar() {
-    if (!originalButton || !stickyBar) return;
+    if ((!originalButton && !originalForm) || !stickyBar) return;
     
-    const shouldShow = !isElementVisible(originalButton);
+    const elementToCheck = originalButton || originalForm;
+    const shouldShow = !isElementVisible(elementToCheck);
     
     if (shouldShow && !isVisible) {
       stickyBar.style.transform = 'translateY(0)';
@@ -136,6 +226,95 @@ export async function loader({ request }) {
     }
   }
   
+  // Set up MutationObserver for dynamically loaded content
+  function setupMutationObserver() {
+    if (mutationObserver) return;
+    
+    mutationObserver = new MutationObserver(function(mutations) {
+      let shouldReinitialize = false;
+      
+      mutations.forEach(function(mutation) {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              // Check if new form or button was added
+              if (node.matches && (
+                node.matches(config.formSelector) || 
+                node.matches(config.buttonSelector) ||
+                node.querySelector(config.formSelector) ||
+                node.querySelector(config.buttonSelector)
+              )) {
+                shouldReinitialize = true;
+              }
+            }
+          });
+        }
+      });
+      
+      if (shouldReinitialize) {
+        console.log('Smart Sticky: DOM change detected, reinitializing...');
+        setTimeout(() => {
+          initializeComponents();
+        }, 500);
+      }
+    });
+    
+    // Observe changes to body and product-specific containers
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Also observe common product containers
+    const productContainers = document.querySelectorAll('.product, .product-form, [class*="product"]');
+    productContainers.forEach(container => {
+      mutationObserver.observe(container, {
+        childList: true,
+        subtree: true
+      });
+    });
+  }
+  
+  // Initialize components
+  function initializeComponents() {
+    // Find the cart form and submit button
+    const { form, button } = findCartForm();
+    originalForm = form;
+    originalButton = button;
+    
+    if (!originalForm && !originalButton) {
+      console.log('Smart Sticky: Cart form or button not found, retrying in 2 seconds...');
+      return false;
+    }
+    
+    console.log('Smart Sticky: Found cart form/button:', { form: !!originalForm, button: !!originalButton });
+    
+    // Create or update sticky bar
+    if (stickyBar) {
+      stickyBar.remove();
+      stickyBar = null;
+    }
+    stickyBar = createStickyBar();
+    
+    return true;
+  }
+  
+  // Cleanup function
+  function cleanup() {
+    if (stickyBar) {
+      stickyBar.remove();
+      stickyBar = null;
+    }
+    if (mutationObserver) {
+      mutationObserver.disconnect();
+      mutationObserver = null;
+    }
+    window.removeEventListener('scroll', handleScroll);
+    window.removeEventListener('resize', handleScroll);
+    window.removeEventListener('beforeunload', cleanup);
+    isVisible = false;
+  }
+  
   // Initialize
   function init() {
     // Wait for DOM to be ready
@@ -144,20 +323,17 @@ export async function loader({ request }) {
       return;
     }
     
-    // Find the add to cart button
-    originalButton = findAddToCartButton();
-    if (!originalButton) {
-      console.log('Smart Sticky: Add to cart button not found, retrying in 2 seconds...');
+    // Initialize components
+    const success = initializeComponents();
+    if (!success) {
       setTimeout(init, 2000);
       return;
     }
     
-    console.log('Smart Sticky: Found add to cart button:', originalButton);
+    // Set up MutationObserver for dynamic content
+    setupMutationObserver();
     
-    // Create sticky bar
-    stickyBar = createStickyBar();
-    
-    // Set up scroll listener
+    // Set up scroll listener with throttling
     let ticking = false;
     function handleScroll() {
       if (!ticking) {
@@ -169,8 +345,12 @@ export async function loader({ request }) {
       }
     }
     
+    // Make handleScroll available for cleanup
+    window.handleScroll = handleScroll;
+    
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleScroll, { passive: true });
+    window.addEventListener('beforeunload', cleanup, { passive: true });
     
     // Initial check
     setTimeout(toggleStickyBar, 500);

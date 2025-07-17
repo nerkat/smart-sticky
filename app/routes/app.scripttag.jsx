@@ -1,4 +1,5 @@
 import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -10,16 +11,29 @@ import {
   Badge,
   Box,
 } from "@shopify/polaris";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 import { getExistingScriptTag } from "../services/scriptTag.server";
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-
   try {
+    // Add defensive check for session
+    const authResult = await authenticate.admin(request);
+    
+    if (!authResult?.session) {
+      console.error('Authentication failed in scripttag loader - no session');
+      return json({
+        shop: null,
+        scriptTag: null,
+        installed: false,
+        error: "Authentication required",
+      });
+    }
+
+    const { session } = authResult;
     const scriptTag = await getExistingScriptTag(session.shop);
+    
     return json({
       shop: session.shop,
       scriptTag,
@@ -28,7 +42,7 @@ export const loader = async ({ request }) => {
   } catch (error) {
     console.error("Error loading ScriptTag status:", error);
     return json({
-      shop: session.shop,
+      shop: null,
       scriptTag: null,
       installed: false,
       error: error.message,
@@ -39,15 +53,78 @@ export const loader = async ({ request }) => {
 export default function ScriptTagManagement() {
   const { shop, scriptTag, installed, error } = useLoaderData();
   const fetcher = useFetcher();
+  const shopify = useAppBridge();
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
+  
   const isLoading = fetcher.state !== "idle";
 
+  // Track hydration to prevent hydration mismatches
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Track App Bridge readiness to ensure session is available
+  useEffect(() => {
+    if (!shopify) return;
+
+    const checkAppReadiness = async () => {
+      try {
+        // Check if App Bridge is ready and can access shop context
+        const shopDomain = await shopify.getShopDomain?.();
+        if (shopDomain) {
+          setIsAppReady(true);
+        } else {
+          // Fallback: assume ready after a short delay if getShopDomain is not available
+          setTimeout(() => setIsAppReady(true), 1000);
+        }
+      } catch (error) {
+        console.warn("App Bridge readiness check failed, defaulting to ready:", error);
+        // Default to ready after delay to avoid indefinite blocking
+        setTimeout(() => setIsAppReady(true), 1500);
+      }
+    };
+
+    checkAppReadiness();
+  }, [shopify]);
+
   const handleInstall = () => {
+    if (!isAppReady || !isHydrated) {
+      shopify?.toast?.show("Please wait for the app to fully load...");
+      return;
+    }
     fetcher.submit({ action: "install" }, { method: "POST", action: "/api/scripttag" });
   };
 
   const handleUninstall = () => {
+    if (!isAppReady || !isHydrated) {
+      shopify?.toast?.show("Please wait for the app to fully load...");
+      return;
+    }
     fetcher.submit({ action: "uninstall" }, { method: "POST", action: "/api/scripttag" });
   };
+
+  // Show loading state during hydration
+  if (!isHydrated) {
+    return (
+      <Page>
+        <TitleBar title="ScriptTag Management" />
+        <BlockStack gap="500">
+          <Layout>
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h2" variant="headingMd">
+                    Loading...
+                  </Text>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          </Layout>
+        </BlockStack>
+      </Page>
+    );
+  }
 
   return (
     <Page>
@@ -71,7 +148,11 @@ export default function ScriptTagManagement() {
                 </InlineStack>
 
                 <Text as="p" variant="bodyMd">
-                  Shop: <strong>{shop}</strong>
+                  {shop ? (
+                    <>Shop: <strong>{shop}</strong></>
+                  ) : (
+                    <Text as="span" tone="critical">Shop information not available</Text>
+                  )}
                 </Text>
 
                 {scriptTag && (
@@ -104,6 +185,19 @@ export default function ScriptTagManagement() {
                     <Text as="p" variant="bodySm" tone="critical">
                       API Error: {fetcher.data.error}
                     </Text>
+                    {fetcher.data.error.includes("Session expired") && (
+                      <Text as="p" variant="bodySm" tone="critical">
+                        Try refreshing the page and make sure you're properly logged in.
+                      </Text>
+                    )}
+                  </Box>
+                )}
+
+                {!isAppReady && (
+                  <Box background="bg-surface-caution" padding="400" borderRadius="200">
+                    <Text as="p" variant="bodySm" tone="caution">
+                      App is initializing... Please wait before performing actions.
+                    </Text>
                   </Box>
                 )}
 
@@ -120,18 +214,20 @@ export default function ScriptTagManagement() {
                     <Button
                       variant="primary"
                       loading={isLoading}
+                      disabled={!isAppReady || !isHydrated}
                       onClick={handleInstall}
                     >
-                      Install ScriptTag
+                      {!isAppReady ? "Loading..." : "Install ScriptTag"}
                     </Button>
                   ) : (
                     <Button
                       variant="primary"
                       tone="critical"
                       loading={isLoading}
+                      disabled={!isAppReady || !isHydrated}
                       onClick={handleUninstall}
                     >
-                      Remove ScriptTag
+                      {!isAppReady ? "Loading..." : "Remove ScriptTag"}
                     </Button>
                   )}
                 </InlineStack>

@@ -29,6 +29,14 @@ export async function getExistingScriptTag(shop) {
  */
 export async function createScriptTag(admin, shop) {
   try {
+    // Validate inputs
+    if (!admin) {
+      throw new Error("Admin API client is required");
+    }
+    if (!shop) {
+      throw new Error("Shop domain is required");
+    }
+
     // Check if already exists in our database
     const existing = await getExistingScriptTag(shop);
     if (existing) {
@@ -61,7 +69,13 @@ export async function createScriptTag(admin, shop) {
       }
     });
 
-    const { data } = await response.json();
+    const result = await response.json();
+    
+    if (!result || !result.data) {
+      throw new Error("Invalid response from Shopify API");
+    }
+
+    const { data } = result;
 
     if (data.scriptTagCreate.userErrors.length > 0) {
       console.error('ScriptTag creation errors:', data.scriptTagCreate.userErrors);
@@ -69,6 +83,11 @@ export async function createScriptTag(admin, shop) {
     }
 
     const scriptTag = data.scriptTagCreate.scriptTag;
+    
+    if (!scriptTag || !scriptTag.id) {
+      throw new Error("ScriptTag creation returned invalid data");
+    }
+    
     const scriptTagId = scriptTag.id.replace('gid://shopify/ScriptTag/', '');
 
     // Save to database
@@ -84,6 +103,10 @@ export async function createScriptTag(admin, shop) {
     return saved;
   } catch (error) {
     console.error('Error creating ScriptTag:', error);
+    // Re-throw with more context if it's a generic error
+    if (error.message === "Unauthorized" || error.message.includes("401")) {
+      throw new Error("Session expired or invalid. Please refresh the page.");
+    }
     throw error;
   }
 }
@@ -93,6 +116,14 @@ export async function createScriptTag(admin, shop) {
  */
 export async function deleteScriptTag(admin, shop) {
   try {
+    // Validate inputs
+    if (!admin) {
+      throw new Error("Admin API client is required");
+    }
+    if (!shop) {
+      throw new Error("Shop domain is required");
+    }
+
     const existing = await getExistingScriptTag(shop);
     if (!existing) {
       console.log(`No ScriptTag found for shop ${shop}`);
@@ -116,7 +147,13 @@ export async function deleteScriptTag(admin, shop) {
       }
     });
 
-    const { data } = await response.json();
+    const result = await response.json();
+    
+    if (!result || !result.data) {
+      throw new Error("Invalid response from Shopify API");
+    }
+
+    const { data } = result;
 
     if (data.scriptTagDelete.userErrors.length > 0) {
       console.error('ScriptTag deletion errors:', data.scriptTagDelete.userErrors);
@@ -132,6 +169,10 @@ export async function deleteScriptTag(admin, shop) {
     return existing;
   } catch (error) {
     console.error('Error deleting ScriptTag:', error);
+    // Re-throw with more context if it's a generic error
+    if (error.message === "Unauthorized" || error.message.includes("401")) {
+      throw new Error("Session expired or invalid. Please refresh the page.");
+    }
     throw error;
   }
 }

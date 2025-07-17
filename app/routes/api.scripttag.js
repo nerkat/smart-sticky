@@ -5,8 +5,16 @@ import { createScriptTag, deleteScriptTag, getExistingScriptTag, listScriptTags 
 
 export async function loader({ request }) {
   try {
-    const { admin, session } = await authenticate.admin(request);
+    // Add defensive check for session
     const url = new URL(request.url);
+    const authResult = await authenticate.admin(request);
+    
+    if (!authResult?.admin || !authResult?.session) {
+      console.error('Authentication failed in scripttag loader - no admin or session');
+      return json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const { admin, session } = authResult;
     const action = url.searchParams.get("action");
 
     switch (action) {
@@ -26,15 +34,35 @@ export async function loader({ request }) {
     }
   } catch (error) {
     console.error('Error in ScriptTag API loader:', error);
+    
+    // Check if it's an authentication error
+    if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+      return json({ error: "Session expired. Please refresh the page." }, { status: 401 });
+    }
+    
     return json({ error: error.message }, { status: 500 });
   }
 }
 
 export async function action({ request }) {
   try {
-    const { admin, session } = await authenticate.admin(request);
+    // Add defensive check for session
+    const authResult = await authenticate.admin(request);
+    
+    if (!authResult?.admin || !authResult?.session) {
+      console.error('Authentication failed in scripttag action - no admin or session');
+      return json({ error: "Authentication required" }, { status: 401 });
+    }
+
+    const { admin, session } = authResult;
     const formData = await request.formData();
     const action = formData.get("action");
+
+    // Additional validation
+    if (!session.shop) {
+      console.error('No shop found in session');
+      return json({ error: "Invalid session - no shop found" }, { status: 400 });
+    }
 
     switch (action) {
       case "install": {
@@ -50,6 +78,17 @@ export async function action({ request }) {
     }
   } catch (error) {
     console.error('Error in ScriptTag API action:', error);
+    
+    // Check if it's an authentication error
+    if (error.message?.includes('Unauthorized') || error.message?.includes('401')) {
+      return json({ error: "Session expired. Please refresh the page." }, { status: 401 });
+    }
+    
+    // Check for specific Shopify API errors
+    if (error.message?.includes('GraphQL')) {
+      return json({ error: `Shopify API error: ${error.message}` }, { status: 422 });
+    }
+    
     return json({ error: error.message }, { status: 500 });
   }
 }

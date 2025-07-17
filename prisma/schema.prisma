@@ -39,3 +39,13 @@ model StickySettings {
 
   @@unique([shop, themeId])
 }
+
+model ScriptTag {
+  id          String   @id @default(cuid())
+  shop        String   @unique
+  scriptTagId String   // Shopify's ScriptTag ID
+  src         String   // URL of the script
+  event       String   // "onload"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

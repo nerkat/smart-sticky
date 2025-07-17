@@ -41,10 +41,12 @@ model StickySettings {
 }
 
 model ScriptTag {
-  id          String   @id @default(cuid())
-  shop        String   @unique
-  scriptTagId String   // Shopify's ScriptTag ID
-  src         String   // URL of the script
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String    @id @default(cuid())
+  shop            String    @unique
+  scriptTagId     String    // Shopify's ScriptTag ID
+  src             String    // URL of the script
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastInstalled   DateTime? // Timestamp of last successful installation
+  lastValidated   DateTime? // Timestamp of last validation check
 }

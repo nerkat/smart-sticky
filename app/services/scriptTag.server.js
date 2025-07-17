@@ -95,7 +95,9 @@ export async function createScriptTag(admin, shop) {
       data: {
         shop,
         scriptTagId,
-        src
+        src,
+        lastInstalled: new Date(),
+        lastValidated: new Date()
       }
     });
 
@@ -206,6 +208,90 @@ export async function listScriptTags(admin) {
     return data.scriptTags.edges.map(edge => edge.node);
   } catch (error) {
     console.error('Error listing ScriptTags:', error);
+    throw error;
+  }
+}
+
+/**
+ * Check if ScriptTag exists in Shopify and update validation timestamp
+ */
+export async function validateScriptTag(admin, shop) {
+  try {
+    const existing = await getExistingScriptTag(shop);
+    if (!existing) {
+      return { exists: false, scriptTag: null };
+    }
+
+    // Check if it still exists in Shopify
+    const scriptTags = await listScriptTags(admin);
+    const shopifyScriptTag = scriptTags.find(st => 
+      st.id.replace('gid://shopify/ScriptTag/', '') === existing.scriptTagId
+    );
+
+    // Update validation timestamp
+    const updated = await prisma.scriptTag.update({
+      where: { shop },
+      data: { lastValidated: new Date() }
+    });
+
+    return { 
+      exists: !!shopifyScriptTag, 
+      scriptTag: updated,
+      shopifyScriptTag 
+    };
+  } catch (error) {
+    console.error('Error validating ScriptTag:', error);
+    throw error;
+  }
+}
+
+/**
+ * Force reinstall ScriptTag (delete and recreate)
+ */
+export async function forceReinstallScriptTag(admin, shop) {
+  try {
+    // Try to delete existing first (ignore errors)
+    try {
+      await deleteScriptTag(admin, shop);
+    } catch (deleteError) {
+      console.warn('Error during deletion in force reinstall (continuing):', deleteError);
+    }
+
+    // Create new one
+    const result = await createScriptTag(admin, shop);
+    console.log(`ScriptTag force reinstalled for shop ${shop}`);
+    return result;
+  } catch (error) {
+    console.error('Error force reinstalling ScriptTag:', error);
+    throw error;
+  }
+}
+
+/**
+ * Revalidate and repair ScriptTag if needed
+ */
+export async function revalidateAndRepair(admin, shop) {
+  try {
+    const validation = await validateScriptTag(admin, shop);
+    
+    if (!validation.exists && validation.scriptTag) {
+      // ScriptTag exists in DB but not in Shopify - recreate it
+      console.log(`ScriptTag missing in Shopify for shop ${shop}, recreating...`);
+      return await forceReinstallScriptTag(admin, shop);
+    }
+
+    if (validation.exists && validation.scriptTag) {
+      // Check if URL changed
+      const currentSrc = getScriptTagSrc();
+      if (validation.shopifyScriptTag?.src !== currentSrc) {
+        console.log(`ScriptTag URL changed for shop ${shop}, updating...`);
+        return await forceReinstallScriptTag(admin, shop);
+      }
+    }
+
+    return validation.scriptTag;
+  } catch (error) {
+    console.error('Error revalidating ScriptTag:', error);
     throw error;
   }
 }

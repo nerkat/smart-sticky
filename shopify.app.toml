@@ -3,7 +3,7 @@
 client_id = "664d98faa9f5f747da25aa32ef554211"
 name = "smart-sticky"
 handle = "smart-sticky"
-application_url = "https://historic-mon-thinkpad-scholars.trycloudflare.com"
+application_url = "https://command-theorem-tolerance-psychology.trycloudflare.com"
 embedded = true
 
 [build]
@@ -26,7 +26,7 @@ api_version = "2025-07"
 scopes = "write_products,read_themes,write_script_tags"
 
 [auth]
-redirect_urls = ["https://historic-mon-thinkpad-scholars.trycloudflare.com/auth/callback", "https://historic-mon-thinkpad-scholars.trycloudflare.com/auth/shopify/callback", "https://historic-mon-thinkpad-scholars.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://command-theorem-tolerance-psychology.trycloudflare.com/auth/callback", "https://command-theorem-tolerance-psychology.trycloudflare.com/auth/shopify/callback", "https://command-theorem-tolerance-psychology.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

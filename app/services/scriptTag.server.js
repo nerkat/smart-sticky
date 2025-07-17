@@ -70,7 +70,7 @@ export async function createScriptTag(admin, shop) {
     });
 
     const result = await response.json();
-    
+
     if (!result || !result.data) {
       throw new Error("Invalid response from Shopify API");
     }
@@ -83,11 +83,11 @@ export async function createScriptTag(admin, shop) {
     }
 
     const scriptTag = data.scriptTagCreate.scriptTag;
-    
+
     if (!scriptTag || !scriptTag.id) {
       throw new Error("ScriptTag creation returned invalid data");
     }
-    
+
     const scriptTagId = scriptTag.id.replace('gid://shopify/ScriptTag/', '');
 
     // Save to database
@@ -148,7 +148,7 @@ export async function deleteScriptTag(admin, shop) {
     });
 
     const result = await response.json();
-    
+
     if (!result || !result.data) {
       throw new Error("Invalid response from Shopify API");
     }
@@ -198,6 +198,11 @@ export async function listScriptTags(admin) {
     `);
 
     const { data } = await response.json();
+    if (!data?.scriptTags?.edges) {
+      console.error("No script tags found or API returned unexpected response:", data);
+      return [];
+    }
+
     return data.scriptTags.edges.map(edge => edge.node);
   } catch (error) {
     console.error('Error listing ScriptTags:', error);

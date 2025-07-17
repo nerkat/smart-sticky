@@ -88,6 +88,18 @@ export default function ScriptTagManagement() {
     checkAppReadiness();
   }, [shopify]);
 
+  // Retry mechanism for failed operations
+  useEffect(() => {
+    if (fetcher.data?.error && fetcher.data.error.includes("Session expired")) {
+      // Auto-retry after session errors by reloading loader data
+      const retryTimer = setTimeout(() => {
+        window.location.reload();
+      }, 3000);
+      
+      return () => clearTimeout(retryTimer);
+    }
+  }, [fetcher.data]);
+
   const handleInstall = () => {
     if (!isAppReady || !isHydrated) {
       shopify?.toast?.show("Please wait for the app to fully load...");
@@ -187,7 +199,7 @@ export default function ScriptTagManagement() {
                     </Text>
                     {fetcher.data.error.includes("Session expired") && (
                       <Text as="p" variant="bodySm" tone="critical">
-                        Try refreshing the page and make sure you're properly logged in.
+                        Session expired. The page will automatically refresh in 3 seconds to restore your session.
                       </Text>
                     )}
                   </Box>

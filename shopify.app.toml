@@ -3,7 +3,7 @@
 client_id = "664d98faa9f5f747da25aa32ef554211"
 name = "smart-sticky"
 handle = "smart-sticky"
-application_url = "https://lemon-fence-handheld-via.trycloudflare.com"
+application_url = "https://historic-mon-thinkpad-scholars.trycloudflare.com"
 embedded = true
 
 [build]
@@ -23,10 +23,10 @@ api_version = "2025-07"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,read_themes"
+scopes = "write_products,read_themes,write_script_tags"
 
 [auth]
-redirect_urls = ["https://lemon-fence-handheld-via.trycloudflare.com/auth/callback", "https://lemon-fence-handheld-via.trycloudflare.com/auth/shopify/callback", "https://lemon-fence-handheld-via.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://historic-mon-thinkpad-scholars.trycloudflare.com/auth/callback", "https://historic-mon-thinkpad-scholars.trycloudflare.com/auth/shopify/callback", "https://historic-mon-thinkpad-scholars.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

@@ -267,6 +267,12 @@ export async function forceReinstallScriptTag(admin, shop) {
   }
 }
 
+// TODO: Add webhook handlers for app uninstall events
+// This would automatically clean up ScriptTags when the app is uninstalled
+// Webhook endpoint: /webhooks/app/uninstalled
+// Should call deleteScriptTag to clean up Shopify ScriptTags
+// and remove DB records for the uninstalled shop
+
 /**
  * Revalidate and repair ScriptTag if needed
  */

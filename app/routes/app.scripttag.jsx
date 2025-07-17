@@ -14,7 +14,8 @@ import {
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
-import { getExistingScriptTag } from "../services/scriptTag.server";
+import { getExistingScriptTag, revalidateAndRepair } from "../services/scriptTag.server";
+import { StickyStatusCard } from "../components/StickyStatusCard";
 
 export const loader = async ({ request }) => {
   try {
@@ -31,14 +32,27 @@ export const loader = async ({ request }) => {
       });
     }
 
-    const { session } = authResult;
-    const scriptTag = await getExistingScriptTag(session.shop);
+    const { session, admin } = authResult;
     
-    return json({
-      shop: session.shop,
-      scriptTag,
-      installed: !!scriptTag,
-    });
+    // Revalidate and repair ScriptTag on page load
+    try {
+      const scriptTag = await revalidateAndRepair(admin, session.shop);
+      return json({
+        shop: session.shop,
+        scriptTag,
+        installed: !!scriptTag,
+        revalidated: true,
+      });
+    } catch (revalidateError) {
+      console.warn('Revalidation failed, falling back to basic check:', revalidateError);
+      const scriptTag = await getExistingScriptTag(session.shop);
+      return json({
+        shop: session.shop,
+        scriptTag,
+        installed: !!scriptTag,
+        revalidated: false,
+      });
+    }
   } catch (error) {
     console.error("Error loading ScriptTag status:", error);
     return json({
@@ -51,11 +65,12 @@ export const loader = async ({ request }) => {
 };
 
 export default function ScriptTagManagement() {
-  const { shop, scriptTag, installed, error } = useLoaderData();
+  const { shop, scriptTag, installed, error, revalidated } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const [isAppReady, setIsAppReady] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [allScriptTags, setAllScriptTags] = useState([]);
   
   const isLoading = fetcher.state !== "idle";
 
@@ -100,6 +115,24 @@ export default function ScriptTagManagement() {
     }
   }, [fetcher.data]);
 
+  // Load all ScriptTags on mount
+  useEffect(() => {
+    if (isAppReady && isHydrated) {
+      fetchAllScriptTags();
+    }
+  }, [isAppReady, isHydrated]);
+
+  const fetchAllScriptTags = () => {
+    fetcher.load("/api/scripttag?action=list");
+  };
+
+  // Update allScriptTags when fetcher data changes
+  useEffect(() => {
+    if (fetcher.data?.scriptTags) {
+      setAllScriptTags(fetcher.data.scriptTags);
+    }
+  }, [fetcher.data]);
+
   const handleInstall = () => {
     if (!isAppReady || !isHydrated) {
       shopify?.toast?.show("Please wait for the app to fully load...");
@@ -114,6 +147,14 @@ export default function ScriptTagManagement() {
       return;
     }
     fetcher.submit({ action: "uninstall" }, { method: "POST", action: "/api/scripttag" });
+  };
+
+  const handleForceReinstall = () => {
+    if (!isAppReady || !isHydrated) {
+      shopify?.toast?.show("Please wait for the app to fully load...");
+      return;
+    }
+    fetcher.submit({ action: "force-reinstall" }, { method: "POST", action: "/api/scripttag" });
   };
 
   // Show loading state during hydration
@@ -144,135 +185,95 @@ export default function ScriptTagManagement() {
       <BlockStack gap="500">
         <Layout>
           <Layout.Section>
-            <Card>
-              <BlockStack gap="400">
-                <Text as="h2" variant="headingMd">
-                  Sticky Bar ScriptTag Status
-                </Text>
-
-                <InlineStack gap="200" align="start">
-                  <Text as="span" variant="bodyMd">
-                    Status:
-                  </Text>
-                  <Badge tone={installed ? "success" : "critical"}>
-                    {installed ? "Installed" : "Not Installed"}
-                  </Badge>
-                </InlineStack>
-
-                <Text as="p" variant="bodyMd">
-                  {shop ? (
-                    <>Shop: <strong>{shop}</strong></>
-                  ) : (
-                    <Text as="span" tone="critical">Shop information not available</Text>
-                  )}
-                </Text>
-
-                {scriptTag && (
-                  <Box background="bg-surface-secondary" padding="400" borderRadius="200">
-                    <BlockStack gap="200">
-                      <Text as="h3" variant="headingSm">ScriptTag Details:</Text>
-                      <Text as="p" variant="bodySm">
-                        <strong>ID:</strong> {scriptTag.scriptTagId || scriptTag.id}
-                      </Text>
-                      <Text as="p" variant="bodySm">
-                        <strong>Source:</strong> {scriptTag.src}
-                      </Text>
-                      <Text as="p" variant="bodySm">
-                        <strong>Created:</strong> {scriptTag.createdAt ? new Date(scriptTag.createdAt).toLocaleString() : ""}
-                      </Text>
-                    </BlockStack>
-                  </Box>
-                )}
-
-                {error && (
-                  <Box background="bg-surface-critical" padding="400" borderRadius="200">
-                    <Text as="p" variant="bodySm" tone="critical">
-                      Error: {error}
-                    </Text>
-                  </Box>
-                )}
-
-                {fetcher.data?.error && (
-                  <Box background="bg-surface-critical" padding="400" borderRadius="200">
-                    <Text as="p" variant="bodySm" tone="critical">
-                      API Error: {fetcher.data.error}
-                    </Text>
-                    {fetcher.data.error.includes("Session expired") && (
-                      <Text as="p" variant="bodySm" tone="critical">
-                        Session expired. The page will automatically refresh in 3 seconds to restore your session.
-                      </Text>
-                    )}
-                  </Box>
-                )}
-
-                {!isAppReady && (
-                  <Box background="bg-surface-caution" padding="400" borderRadius="200">
-                    <Text as="p" variant="bodySm" tone="caution">
-                      App is initializing... Please wait before performing actions.
-                    </Text>
-                  </Box>
-                )}
-
-                {fetcher.data?.success && (
-                  <Box background="bg-surface-success" padding="400" borderRadius="200">
-                    <Text as="p" variant="bodySm" tone="success">
-                      Operation completed successfully!
-                    </Text>
-                  </Box>
-                )}
-
-                <InlineStack gap="300">
-                  {!installed ? (
-                    <Button
-                      variant="primary"
-                      loading={isLoading}
-                      disabled={!isAppReady || !isHydrated}
-                      onClick={handleInstall}
-                    >
-                      {!isAppReady ? "Loading..." : "Install ScriptTag"}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="primary"
-                      tone="critical"
-                      loading={isLoading}
-                      disabled={!isAppReady || !isHydrated}
-                      onClick={handleUninstall}
-                    >
-                      {!isAppReady ? "Loading..." : "Remove ScriptTag"}
-                    </Button>
-                  )}
-                </InlineStack>
-
-                <Text as="p" variant="bodyMd">
-                  The ScriptTag automatically injects the sticky bar functionality into your storefront.
-                  When installed, it will load the sticky add-to-cart bar script on all product pages.
-                </Text>
-              </BlockStack>
-            </Card>
+            <StickyStatusCard
+              installed={installed}
+              scriptTag={scriptTag}
+              error={error}
+              shop={shop}
+              onInstall={handleInstall}
+              onUninstall={handleUninstall}
+              onForceReinstall={handleForceReinstall}
+              isLoading={isLoading}
+              isAppReady={isAppReady}
+              actionError={fetcher.data?.error}
+              actionSuccess={fetcher.data?.success}
+            />
           </Layout.Section>
+
+          {revalidated && (
+            <Layout.Section>
+              <Card>
+                <Box background="bg-surface-success" padding="400" borderRadius="200">
+                  <Text as="p" variant="bodySm" tone="success">
+                    ✓ ScriptTag automatically revalidated on page load
+                  </Text>
+                </Box>
+              </Card>
+            </Layout.Section>
+          )}
+
+          {allScriptTags.length > 0 && (
+            <Layout.Section>
+              <Card>
+                <BlockStack gap="400">
+                  <Text as="h3" variant="headingMd">
+                    All ScriptTags in Shopify ({allScriptTags.length})
+                  </Text>
+                  <BlockStack gap="300">
+                    {allScriptTags.map((tag, index) => (
+                      <Box key={index} background="bg-surface-secondary" padding="300" borderRadius="200">
+                        <BlockStack gap="200">
+                          <Text as="p" variant="bodySm">
+                            <strong>ID:</strong> {tag.id.replace('gid://shopify/ScriptTag/', '')}
+                          </Text>
+                          <Text as="p" variant="bodySm">
+                            <strong>Source:</strong> {tag.src}
+                          </Text>
+                          <Text as="p" variant="bodySm">
+                            <strong>Scope:</strong> {tag.displayScope}
+                          </Text>
+                          <Text as="p" variant="bodySm">
+                            <strong>Created:</strong> {new Date(tag.createdAt).toLocaleString()}
+                          </Text>
+                          {tag.src.includes('/stickybar.js') && (
+                            <Badge tone="info">Smart Sticky Script</Badge>
+                          )}
+                        </BlockStack>
+                      </Box>
+                    ))}
+                  </BlockStack>
+                </BlockStack>
+              </Card>
+            </Layout.Section>
+          )}
 
           <Layout.Section variant="oneThird">
             <Card>
               <BlockStack gap="300">
                 <Text as="h3" variant="headingMd">
-                  How it works
+                  Enhanced Features
                 </Text>
                 <BlockStack gap="200">
                   <Text as="p" variant="bodyMd">
-                    1. ScriptTag is automatically installed when your app is installed
+                    ✓ Product page detection only
                   </Text>
                   <Text as="p" variant="bodyMd">
-                    2. The script loads on every storefront page
+                    ✓ Form cloning with variant selection
                   </Text>
                   <Text as="p" variant="bodyMd">
-                    3. On product pages, it detects the add-to-cart button
+                    ✓ Mobile-responsive design
                   </Text>
                   <Text as="p" variant="bodyMd">
-                    4. Shows a sticky bar when the original button scrolls out of view
+                    ✓ Smooth animations
                   </Text>
                   <Text as="p" variant="bodyMd">
-                    5. ScriptTag is automatically removed when the app is uninstalled
+                    ✓ Dynamic content detection
+                  </Text>
+                  <Text as="p" variant="bodyMd">
+                    ✓ Automatic cleanup on unload
+                  </Text>
+                  <Text as="p" variant="bodyMd">
+                    ✓ Auto-revalidation on page load
                   </Text>
                 </BlockStack>
               </BlockStack>

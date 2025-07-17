@@ -13,13 +13,13 @@ import '@shopify/polaris/build/esm/styles.css';
 export function ErrorBoundary() {
   const error = useRouteError();
   return (
-    <html>
+    <html suppressHydrationWarning>
       <head>
         <title>Oops!</title>
         <Meta />
         <Links />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <h1>Something went wrong</h1>
         <pre>{isRouteErrorResponse(error) ? error.statusText : String(error)}</pre>
         <Scripts />
@@ -30,7 +30,7 @@ export function ErrorBoundary() {
 
 export default function App() {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -42,7 +42,7 @@ export default function App() {
         <Meta />
         <Links />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         <Outlet />
         <ScrollRestoration />
         <Scripts />

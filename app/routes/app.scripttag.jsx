@@ -17,7 +17,7 @@ import { getExistingScriptTag } from "../services/scriptTag.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  
+
   try {
     const scriptTag = await getExistingScriptTag(session.shop);
     return json({
@@ -26,7 +26,7 @@ export const loader = async ({ request }) => {
       installed: !!scriptTag,
     });
   } catch (error) {
-    console.error('Error loading ScriptTag status:', error);
+    console.error("Error loading ScriptTag status:", error);
     return json({
       shop: session.shop,
       scriptTag: null,
@@ -39,7 +39,6 @@ export const loader = async ({ request }) => {
 export default function ScriptTagManagement() {
   const { shop, scriptTag, installed, error } = useLoaderData();
   const fetcher = useFetcher();
-  
   const isLoading = fetcher.state !== "idle";
 
   const handleInstall = () => {
@@ -61,7 +60,7 @@ export default function ScriptTagManagement() {
                 <Text as="h2" variant="headingMd">
                   Sticky Bar ScriptTag Status
                 </Text>
-                
+
                 <InlineStack gap="200" align="start">
                   <Text as="span" variant="bodyMd">
                     Status:
@@ -80,16 +79,13 @@ export default function ScriptTagManagement() {
                     <BlockStack gap="200">
                       <Text as="h3" variant="headingSm">ScriptTag Details:</Text>
                       <Text as="p" variant="bodySm">
-                        <strong>ID:</strong> {scriptTag.scriptTagId}
+                        <strong>ID:</strong> {scriptTag.scriptTagId || scriptTag.id}
                       </Text>
                       <Text as="p" variant="bodySm">
                         <strong>Source:</strong> {scriptTag.src}
                       </Text>
                       <Text as="p" variant="bodySm">
-                        <strong>Event:</strong> {scriptTag.event}
-                      </Text>
-                      <Text as="p" variant="bodySm">
-                        <strong>Created:</strong> {new Date(scriptTag.createdAt).toLocaleString()}
+                        <strong>Created:</strong> {scriptTag.createdAt ? new Date(scriptTag.createdAt).toLocaleString() : ""}
                       </Text>
                     </BlockStack>
                   </Box>
@@ -147,7 +143,7 @@ export default function ScriptTagManagement() {
               </BlockStack>
             </Card>
           </Layout.Section>
-          
+
           <Layout.Section variant="oneThird">
             <Card>
               <BlockStack gap="300">

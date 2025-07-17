@@ -44,7 +44,6 @@ export async function createScriptTag(admin, shop) {
           scriptTag {
             id
             src
-            event
             displayScope
           }
           userErrors {
@@ -57,14 +56,13 @@ export async function createScriptTag(admin, shop) {
       variables: {
         input: {
           src,
-          event: "ONLOAD",
           displayScope: "ONLINE_STORE"
         }
       }
     });
 
     const { data } = await response.json();
-    
+
     if (data.scriptTagCreate.userErrors.length > 0) {
       console.error('ScriptTag creation errors:', data.scriptTagCreate.userErrors);
       throw new Error(`Failed to create ScriptTag: ${data.scriptTagCreate.userErrors[0].message}`);
@@ -78,8 +76,7 @@ export async function createScriptTag(admin, shop) {
       data: {
         shop,
         scriptTagId,
-        src,
-        event: "onload"
+        src
       }
     });
 
@@ -120,7 +117,7 @@ export async function deleteScriptTag(admin, shop) {
     });
 
     const { data } = await response.json();
-    
+
     if (data.scriptTagDelete.userErrors.length > 0) {
       console.error('ScriptTag deletion errors:', data.scriptTagDelete.userErrors);
       throw new Error(`Failed to delete ScriptTag: ${data.scriptTagDelete.userErrors[0].message}`);
@@ -151,7 +148,6 @@ export async function listScriptTags(admin) {
             node {
               id
               src
-              event
               displayScope
               createdAt
             }

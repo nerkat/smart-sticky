@@ -12,7 +12,7 @@ function getAppUrl() {
  * Get the ScriptTag source URL
  */
 function getScriptTagSrc() {
-  return `${getAppUrl()}/stickybar.js`;
+  return `${getAppUrl()}/stickybar`;
 }
 
 /**

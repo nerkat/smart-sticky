@@ -5,8 +5,9 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  isRouteErrorResponse,
+  useRouteError,
 } from "@remix-run/react";
-import { isRouteErrorResponse, useRouteError } from "@remix-run/react";
 import '@shopify/polaris/build/esm/styles.css';
 
 export function ErrorBoundary() {

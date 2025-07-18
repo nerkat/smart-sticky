@@ -58,10 +58,14 @@ export const loader = async ({ request }) => {
 
     return json({
       shop: session.shop,
-      settings: settings || {
+      settings: settings ? {
+        ...settings,
+        isFromDatabase: true,
+      } : {
         ...DEFAULT_SETTINGS,
         shop: session.shop,
         themeId: defaultThemeId,
+        isFromDatabase: false,
       },
       scriptTag,
       scriptTagInstalled: !!scriptTag,
@@ -198,12 +202,13 @@ export default function Settings() {
   // Initialize form state when loader data changes (only on mount/navigation)
   useEffect(() => {
     console.log("Initializing form state with loader data:", settings);
+    console.log("Settings are from database:", settings.isFromDatabase);
     setFormData({
       enabled: settings.enabled,
       position: settings.position,
       offset: settings.offset.toString(),
     });
-  }, [settings.shop, settings.themeId]); // Only re-run when shop or themeId changes
+  }, [settings.shop, settings.themeId, settings.isFromDatabase, settings.enabled, settings.position, settings.offset]); // Re-run when relevant settings change
 
   // Position options
   const positionOptions = [
@@ -218,6 +223,18 @@ export default function Settings() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">
+            {/* Debug Banner */}
+            <Banner
+              title={settings.isFromDatabase ? "Settings loaded from database" : "Using default settings"}
+              tone={settings.isFromDatabase ? "success" : "info"}
+            >
+              <Text as="p">
+                {settings.isFromDatabase 
+                  ? "Your saved settings have been loaded successfully."
+                  : "No saved settings found. Using default values."}
+              </Text>
+            </Banner>
+            
             {/* Status Banner */}
             {!scriptTagInstalled && (
               <Banner

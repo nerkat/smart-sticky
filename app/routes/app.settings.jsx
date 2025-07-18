@@ -108,18 +108,25 @@ export default function Settings() {
     if (fetcher.data?.success && fetcher.data?.saved) {
       shopify.toast.show("Settings saved successfully!");
       console.log("Settings saved:", fetcher.data.saved);
+      
+      // Update form state with the saved data
+      setFormData({
+        enabled: fetcher.data.saved.enabled,
+        position: fetcher.data.saved.position,
+        offset: fetcher.data.saved.offset.toString(),
+      });
     }
   }, [fetcher.data, shopify]);
 
-  // Sync form state with loader data (including after page reload)
+  // Initialize form state when loader data changes (only on mount/navigation)
   useEffect(() => {
-    console.log("Syncing form state with loader data:", settings);
+    console.log("Initializing form state with loader data:", settings);
     setFormData({
       enabled: settings.enabled,
       position: settings.position,
       offset: settings.offset.toString(),
     });
-  }, [settings.enabled, settings.position, settings.offset]);
+  }, [settings.shop, settings.themeId]); // Only re-run when shop or themeId changes
 
   // Position options
   const positionOptions = [

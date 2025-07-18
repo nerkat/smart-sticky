@@ -1,4 +1,4 @@
-import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher, useRevalidator } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import {
   Page,
@@ -75,6 +75,7 @@ export const loader = async ({ request }) => {
 export default function Settings() {
   const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
+  const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const [formData, setFormData] = useState({
     enabled: settings.enabled,
@@ -100,20 +101,14 @@ export default function Settings() {
     );
   };
 
-  // Show success message and update form state after successful save
+  // Show success message and revalidate loader data after successful save
   useEffect(() => {
     if (fetcher.data?.success) {
       shopify.toast.show("Settings saved successfully!");
-      // Update form state to reflect the saved settings
-      if (fetcher.data.saved) {
-        setFormData({
-          enabled: fetcher.data.saved.enabled,
-          position: fetcher.data.saved.position,
-          offset: fetcher.data.saved.offset.toString(),
-        });
-      }
+      // Revalidate the loader to get fresh data from the server
+      revalidator.revalidate();
     }
-  }, [fetcher.data, shopify]);
+  }, [fetcher.data, shopify, revalidator]);
 
   // Update form state when settings from loader change (e.g., on page reload)
   useEffect(() => {

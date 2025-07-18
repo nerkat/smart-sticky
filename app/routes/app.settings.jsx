@@ -1,5 +1,5 @@
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Page,
   Layout,
@@ -171,6 +171,16 @@ export default function Settings() {
                     formData.position !== settings.position || 
                     parseInt(formData.offset) !== settings.offset;
 
+  // Create a stable reference to the settings for useEffect
+  const settingsForEffect = useMemo(() => ({
+    shop: settings.shop,
+    themeId: settings.themeId,
+    isFromDatabase: settings.isFromDatabase,
+    enabled: settings.enabled,
+    position: settings.position,
+    offset: settings.offset,
+  }), [settings.shop, settings.themeId, settings.isFromDatabase, settings.enabled, settings.position, settings.offset]);
+
   // Handle form submission
   const handleSave = () => {
     fetcher.submit(
@@ -201,14 +211,14 @@ export default function Settings() {
 
   // Initialize form state when loader data changes (only on mount/navigation)
   useEffect(() => {
-    console.log("Initializing form state with loader data:", settings);
-    console.log("Settings are from database:", settings.isFromDatabase);
+    console.log("Initializing form state with loader data:", settingsForEffect);
+    console.log("Settings are from database:", settingsForEffect.isFromDatabase);
     setFormData({
-      enabled: settings.enabled,
-      position: settings.position,
-      offset: settings.offset.toString(),
+      enabled: settingsForEffect.enabled,
+      position: settingsForEffect.position,
+      offset: settingsForEffect.offset.toString(),
     });
-  }, [settings.shop, settings.themeId, settings.isFromDatabase, settings.enabled, settings.position, settings.offset]); // Re-run when relevant settings change
+  }, [settingsForEffect]); // Re-run when relevant settings change
 
   // Position options
   const positionOptions = [

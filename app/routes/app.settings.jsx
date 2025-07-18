@@ -81,7 +81,6 @@ export default function Settings() {
     position: settings.position,
     offset: settings.offset.toString(),
   });
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   const isLoading = fetcher.state !== "idle";
   const hasChanges = formData.enabled !== settings.enabled || 
@@ -114,17 +113,14 @@ export default function Settings() {
     }
   }, [fetcher.data, shopify]);
 
-  // Update form state when settings from loader change (only on initial load or page reload)
+  // Update form state when settings from loader change (always sync with loader data)
   useEffect(() => {
-    if (isInitialLoad) {
-      setFormData({
-        enabled: settings.enabled,
-        position: settings.position,
-        offset: settings.offset.toString(),
-      });
-      setIsInitialLoad(false);
-    }
-  }, [settings, isInitialLoad]);
+    setFormData({
+      enabled: settings.enabled,
+      position: settings.position,
+      offset: settings.offset.toString(),
+    });
+  }, [settings]);
 
   // Position options
   const positionOptions = [

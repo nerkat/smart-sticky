@@ -97,6 +97,7 @@ export async function action({ request }) {
   }
   
   const { themeId, enabled, position, offset } = body;
+  console.log("Saving settings:", { themeId, enabled, position, offset, shop: session.shop });
 
   if (!themeId) return json({ error: "Missing themeId" }, { status: 400 });
 
@@ -132,5 +133,6 @@ export async function action({ request }) {
     },
   });
 
+  console.log("Settings saved to database:", saved);
   return json({ success: true, saved });
 }

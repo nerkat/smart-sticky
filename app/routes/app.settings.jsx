@@ -1,4 +1,4 @@
-import { useLoaderData, useFetcher, useRevalidator } from "@remix-run/react";
+import { useLoaderData, useFetcher } from "@remix-run/react";
 import { useState, useEffect } from "react";
 import {
   Page,
@@ -75,13 +75,13 @@ export const loader = async ({ request }) => {
 export default function Settings() {
   const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
-  const revalidator = useRevalidator();
   const shopify = useAppBridge();
   const [formData, setFormData] = useState({
     enabled: settings.enabled,
     position: settings.position,
     offset: settings.offset.toString(),
   });
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   
   const isLoading = fetcher.state !== "idle";
   const hasChanges = formData.enabled !== settings.enabled || 
@@ -101,23 +101,30 @@ export default function Settings() {
     );
   };
 
-  // Show success message and revalidate loader data after successful save
+  // Show success message and update form state from saved data
   useEffect(() => {
-    if (fetcher.data?.success) {
+    if (fetcher.data?.success && fetcher.data?.saved) {
       shopify.toast.show("Settings saved successfully!");
-      // Revalidate the loader to get fresh data from the server
-      revalidator.revalidate();
+      // Update form state from the saved data returned by the API
+      setFormData({
+        enabled: fetcher.data.saved.enabled,
+        position: fetcher.data.saved.position,
+        offset: fetcher.data.saved.offset.toString(),
+      });
     }
-  }, [fetcher.data, shopify, revalidator]);
+  }, [fetcher.data, shopify]);
 
-  // Update form state when settings from loader change (e.g., on page reload)
+  // Update form state when settings from loader change (only on initial load or page reload)
   useEffect(() => {
-    setFormData({
-      enabled: settings.enabled,
-      position: settings.position,
-      offset: settings.offset.toString(),
-    });
-  }, [settings]);
+    if (isInitialLoad) {
+      setFormData({
+        enabled: settings.enabled,
+        position: settings.position,
+        offset: settings.offset.toString(),
+      });
+      setIsInitialLoad(false);
+    }
+  }, [settings, isInitialLoad]);
 
   // Position options
   const positionOptions = [

@@ -36,9 +36,21 @@ export const loader = async ({ request }) => {
     
     console.log("Loader - Session:", session);
     console.log("Loader - Session.shop:", session.shop);
+    console.log("Loader - Session type:", typeof session.shop);
+    console.log("Loader - Session.shop length:", session.shop?.length);
     
     // Get first theme as default (you might want to get the current theme)
     const defaultThemeId = "main";
+    
+    // Debug: Let's see what's actually in the database
+    const allSettings = await prisma.stickySettings.findMany({
+      where: {
+        shop: {
+          contains: session.shop?.split('.')[0] || ''
+        }
+      },
+    });
+    console.log("Loader - All settings for shop pattern:", allSettings);
     
     // Get settings for the default theme
     const settings = await prisma.stickySettings.findUnique({
@@ -88,6 +100,8 @@ export const action = async ({ request }) => {
     
     console.log("Action - Session:", session);
     console.log("Action - Session.shop:", session.shop);
+    console.log("Action - Session type:", typeof session.shop);
+    console.log("Action - Session.shop length:", session.shop?.length);
     
     // Handle form data from Remix fetcher
     const formData = await request.formData();
@@ -149,6 +163,14 @@ export const action = async ({ request }) => {
     
     console.log("Action - Verification read:", verification);
     
+    // Also check if we can find any settings for this shop
+    const allShopSettings = await prisma.stickySettings.findMany({
+      where: {
+        shop: session.shop,
+      },
+    });
+    console.log("Action - All settings for this shop:", allShopSettings);
+    
     return json({ success: true, saved });
   } catch (error) {
     console.error("Action - Error saving settings:", error);
@@ -160,11 +182,20 @@ export default function Settings() {
   const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
+  
+  // Debug log the settings received from loader
+  console.log("UI - Settings received from loader:", settings);
+  console.log("UI - Shop:", shop);
+  console.log("UI - Settings.isFromDatabase:", settings.isFromDatabase);
+  
   const [formData, setFormData] = useState({
     enabled: settings.enabled,
     position: settings.position,
     offset: settings.offset.toString(),
   });
+  
+  // Debug log the initial form data
+  console.log("UI - Initial formData:", formData);
   
   const isLoading = fetcher.state !== "idle";
   const hasChanges = formData.enabled !== settings.enabled || 

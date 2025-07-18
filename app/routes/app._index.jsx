@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useFetcher } from "@remix-run/react";
+import { useLoaderData, useFetcher } from "@remix-run/react";
+import { useState, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -8,321 +8,325 @@ import {
   Button,
   BlockStack,
   Box,
-  List,
-  Link,
   InlineStack,
+  Badge,
+  Link,
+  Banner,
+  List,
 } from "@shopify/polaris";
 import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
+import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
+import { getExistingScriptTag } from "../services/scriptTag.server";
+import prisma from "../db.server";
+
+// Default settings
+const DEFAULT_SETTINGS = {
+  enabled: true,
+  position: "bottom",
+  offset: 100,
+};
 
 export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-
-  return null;
-};
-
-export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
-                  id
-                  price
-                  barcode
-                  createdAt
-                }
-              }
-            }
-          }
-        }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
+  try {
+    const { session } = await authenticate.admin(request);
+    
+    // Get first theme as default
+    const defaultThemeId = "main";
+    
+    // Get settings for the default theme
+    const settings = await prisma.stickySettings.findUnique({
+      where: {
+        shop_themeId: {
+          shop: session.shop,
+          themeId: defaultThemeId,
         },
       },
-    },
-  );
-  const responseJson = await response.json();
-  const product = responseJson.data.productCreate.product;
-  const variantId = product.variants.edges[0].node.id;
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyRemixTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
-      }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-  const variantResponseJson = await variantResponse.json();
+    });
 
-  return {
-    product: responseJson.data.productCreate.product,
-    variant: variantResponseJson.data.productVariantsBulkUpdate.productVariants,
-  };
+    // Get ScriptTag status
+    const scriptTag = await getExistingScriptTag(session.shop);
+
+    return json({
+      shop: session.shop,
+      settings: settings || {
+        ...DEFAULT_SETTINGS,
+        shop: session.shop,
+        themeId: defaultThemeId,
+      },
+      scriptTag,
+      scriptTagInstalled: !!scriptTag,
+    });
+  } catch (error) {
+    console.error("Error loading dashboard:", error);
+    return json({
+      shop: null,
+      settings: DEFAULT_SETTINGS,
+      scriptTag: null,
+      scriptTagInstalled: false,
+      error: error.message,
+    });
+  }
 };
 
-export default function Index() {
+export default function Dashboard() {
+  const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
-  const productId = fetcher.data?.product?.id.replace(
-    "gid://shopify/Product/",
-    "",
-  );
+  const [isHydrated, setIsHydrated] = useState(false);
 
+  // Track hydration to prevent hydration mismatches
   useEffect(() => {
-    if (productId) {
-      shopify.toast.show("Product created");
-    }
-  }, [productId, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+    setIsHydrated(true);
+  }, []);
 
-  return (
-    <Page>
-      <TitleBar title="Remix app template">
-        <button variant="primary" onClick={generateProduct}>
-          Generate a product
-        </button>
-      </TitleBar>
-      <BlockStack gap="500">
+  // Show success message from settings
+  useEffect(() => {
+    if (fetcher.data?.success) {
+      shopify.toast.show("Settings updated successfully!");
+    }
+  }, [fetcher.data, shopify]);
+
+  // Prevent hydration mismatch
+  if (!isHydrated) {
+    return (
+      <Page>
+        <TitleBar title="Smart Sticky Dashboard" />
         <Layout>
           <Layout.Section>
             <Card>
-              <BlockStack gap="500">
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Congrats on creating a new Shopify app 🎉
-                  </Text>
-                  <Text variant="bodyMd" as="p">
-                    This embedded app template uses{" "}
-                    <Link
-                      url="https://shopify.dev/docs/apps/tools/app-bridge"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      App Bridge
-                    </Link>{" "}
-                    interface examples like an{" "}
-                    <Link url="/app/additional" removeUnderline>
-                      additional page in the app nav
-                    </Link>
-                    , as well as an{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      Admin GraphQL
-                    </Link>{" "}
-                    mutation demo, to provide a starting point for app
-                    development.
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingMd">
-                    Get started with products
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    Generate a product with GraphQL and get the JSON output for
-                    that product. Learn more about the{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      productCreate
-                    </Link>{" "}
-                    mutation in our API references.
-                  </Text>
-                </BlockStack>
-                <InlineStack gap="300">
-                  <Button loading={isLoading} onClick={generateProduct}>
-                    Generate a product
-                  </Button>
-                  {fetcher.data?.product && (
-                    <Button
-                      url={`shopify:admin/products/${productId}`}
-                      target="_blank"
-                      variant="plain"
-                    >
-                      View product
-                    </Button>
-                  )}
-                </InlineStack>
-                {fetcher.data?.product && (
-                  <>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productCreate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.product, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productVariantsBulkUpdate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.variant, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                  </>
-                )}
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">
+                  Loading...
+                </Text>
               </BlockStack>
             </Card>
           </Layout.Section>
-          <Layout.Section variant="oneThird">
-            <BlockStack gap="500">
-              <Card>
-                <BlockStack gap="200">
+        </Layout>
+      </Page>
+    );
+  }
+
+  return (
+    <Page>
+      <TitleBar title="Smart Sticky Dashboard" />
+      
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="500">
+            {/* Welcome Banner */}
+            <Banner
+              title="Welcome to Smart Sticky"
+              tone="info"
+            >
+              <Text as="p">
+                Add a sticky "Add to Cart" bar to your product pages to improve mobile conversion rates.
+              </Text>
+            </Banner>
+
+            {error && (
+              <Banner title="Error" tone="critical">
+                <Text as="p">{error}</Text>
+              </Banner>
+            )}
+
+            {/* Status Overview */}
+            <Card>
+              <BlockStack gap="400">
+                <Box paddingBlockEnd="200">
                   <Text as="h2" variant="headingMd">
-                    App template specs
+                    Current Status
                   </Text>
-                  <BlockStack gap="200">
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Framework
-                      </Text>
-                      <Link
-                        url="https://remix.run"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Remix
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Database
-                      </Text>
-                      <Link
-                        url="https://www.prisma.io/"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Prisma
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Interface
-                      </Text>
-                      <span>
-                        <Link
-                          url="https://polaris.shopify.com"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          Polaris
-                        </Link>
-                        {", "}
-                        <Link
-                          url="https://shopify.dev/docs/apps/tools/app-bridge"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          App Bridge
-                        </Link>
-                      </span>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        API
-                      </Text>
-                      <Link
-                        url="https://shopify.dev/docs/api/admin-graphql"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphQL API
-                      </Link>
-                    </InlineStack>
-                  </BlockStack>
+                  <Text as="p" variant="bodyMd" tone="subdued">
+                    Overview of your sticky bar configuration
+                  </Text>
+                </Box>
+
+                <BlockStack gap="300">
+                  <InlineStack gap="400" align="space-between">
+                    <Text as="p" variant="bodyMd">
+                      <strong>Shop:</strong> {shop || "Unknown"}
+                    </Text>
+                    <Badge tone={scriptTagInstalled ? "success" : "critical"}>
+                      {scriptTagInstalled ? "Script Installed" : "Script Not Installed"}
+                    </Badge>
+                  </InlineStack>
+
+                  <InlineStack gap="400" align="space-between">
+                    <Text as="p" variant="bodyMd">
+                      <strong>Sticky Bar:</strong> {settings.enabled ? "Enabled" : "Disabled"}
+                    </Text>
+                    <Badge tone={settings.enabled ? "success" : "attention"}>
+                      {settings.enabled ? "Active" : "Inactive"}
+                    </Badge>
+                  </InlineStack>
+
+                  <InlineStack gap="400" align="space-between">
+                    <Text as="p" variant="bodyMd">
+                      <strong>Position:</strong> {settings.position === "bottom" ? "Bottom of screen" : "Top of screen"}
+                    </Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      Offset: {settings.offset}px
+                    </Text>
+                  </InlineStack>
                 </BlockStack>
-              </Card>
+
+                <InlineStack gap="300">
+                  <Button
+                    variant="primary"
+                    url="/app/settings"
+                  >
+                    Configure Settings
+                  </Button>
+                  {!scriptTagInstalled && (
+                    <Button
+                      url="/app/scripttag"
+                    >
+                      Install Script
+                    </Button>
+                  )}
+                </InlineStack>
+              </BlockStack>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <BlockStack gap="400">
+                <Text as="h2" variant="headingMd">
+                  Quick Actions
+                </Text>
+                
+                <Box
+                  background="bg-surface-secondary"
+                  padding="400"
+                  borderRadius="200"
+                >
+                  <InlineStack gap="300" wrap>
+                    <Button
+                      url="/app/settings"
+                      size="medium"
+                    >
+                      Settings
+                    </Button>
+                    <Button
+                      url="/app/scripttag"
+                      size="medium"
+                    >
+                      Script Management
+                    </Button>
+                  </InlineStack>
+                </Box>
+              </BlockStack>
+            </Card>
+
+            {/* Setup Guide */}
+            {!scriptTagInstalled && (
               <Card>
-                <BlockStack gap="200">
+                <BlockStack gap="400">
                   <Text as="h2" variant="headingMd">
-                    Next steps
+                    Setup Guide
                   </Text>
-                  <List>
+                  <Text as="p" variant="bodyMd">
+                    Follow these steps to get your sticky bar working:
+                  </Text>
+                  <List type="number">
                     <List.Item>
-                      Build an{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/getting-started/build-app-example"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        {" "}
-                        example app
-                      </Link>{" "}
-                      to get started
+                      <Link url="/app/scripttag">
+                        Install the ScriptTag
+                      </Link> to inject the sticky bar script
                     </List.Item>
                     <List.Item>
-                      Explore Shopify’s API with{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphiQL
-                      </Link>
+                      <Link url="/app/settings">
+                        Configure your settings
+                      </Link> (position, offset, etc.)
+                    </List.Item>
+                    <List.Item>
+                      Visit a product page on your store to test the sticky bar
                     </List.Item>
                   </List>
                 </BlockStack>
               </Card>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
+            )}
+          </BlockStack>
+        </Layout.Section>
+
+        <Layout.Section variant="oneThird">
+          <BlockStack gap="500">
+            {/* Feature Overview */}
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h3" variant="headingMd">
+                  Features
+                </Text>
+                <List>
+                  <List.Item>
+                    Sticky add-to-cart bar on product pages
+                  </List.Item>
+                  <List.Item>
+                    Automatic cart form detection
+                  </List.Item>
+                  <List.Item>
+                    Responsive mobile design
+                  </List.Item>
+                  <List.Item>
+                    Variant and quantity support
+                  </List.Item>
+                  <List.Item>
+                    Theme-agnostic compatibility
+                  </List.Item>
+                  <List.Item>
+                    Easy installation and setup
+                  </List.Item>
+                </List>
+              </BlockStack>
+            </Card>
+
+            {/* Performance Impact */}
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h3" variant="headingMd">
+                  Performance
+                </Text>
+                <BlockStack gap="200">
+                  <InlineStack gap="200" align="space-between">
+                    <Text as="span" variant="bodyMd">Script Size:</Text>
+                    <Text as="span" variant="bodyMd" tone="subdued">
+                      ~15KB
+                    </Text>
+                  </InlineStack>
+                  <InlineStack gap="200" align="space-between">
+                    <Text as="span" variant="bodyMd">Load Time:</Text>
+                    <Text as="span" variant="bodyMd" tone="subdued">
+                      &lt;50ms
+                    </Text>
+                  </InlineStack>
+                  <InlineStack gap="200" align="space-between">
+                    <Text as="span" variant="bodyMd">Page Impact:</Text>
+                    <Text as="span" variant="bodyMd" tone="success">
+                      Minimal
+                    </Text>
+                  </InlineStack>
+                </BlockStack>
+              </BlockStack>
+            </Card>
+
+            {/* Support */}
+            <Card>
+              <BlockStack gap="300">
+                <Text as="h3" variant="headingMd">
+                  Support
+                </Text>
+                <Text as="p" variant="bodyMd">
+                  The sticky bar works on product pages only (/products/*) and automatically detects your theme's cart forms.
+                </Text>
+                <Text as="p" variant="bodyMd">
+                  If you experience issues, try using the "Force Reinstall" option in Script Management.
+                </Text>
+              </BlockStack>
+            </Card>
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
     </Page>
   );
 }

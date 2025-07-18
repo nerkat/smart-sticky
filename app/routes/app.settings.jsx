@@ -73,7 +73,7 @@ export const loader = async ({ request }) => {
 };
 
 export default function Settings() {
-  const { shop, settings, scriptTag, scriptTagInstalled, error } = useLoaderData();
+  const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const [formData, setFormData] = useState({

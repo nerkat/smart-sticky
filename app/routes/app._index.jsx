@@ -70,7 +70,7 @@ export const loader = async ({ request }) => {
 };
 
 export default function Dashboard() {
-  const { shop, settings, scriptTag, scriptTagInstalled, error } = useLoaderData();
+  const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const [isHydrated, setIsHydrated] = useState(false);

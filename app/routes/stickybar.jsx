@@ -106,6 +106,16 @@ export async function loader({ request }) {
         padding: 12px 16px;
         gap: 12px;
       }
+      
+      @media (max-width: 480px) {
+        padding: 10px 12px;
+        gap: 8px;
+      }
+      
+      @media (max-width: 320px) {
+        padding: 8px 10px;
+        gap: 6px;
+      }
     \`;
     
     // Get product info
@@ -141,7 +151,7 @@ export async function loader({ request }) {
     
     bar.innerHTML = \`
       <div style="display: flex; align-items: center; gap: 15px; width: 100%; max-width: 1200px; flex-wrap: wrap;">
-        <div style="flex: 1; min-width: 200px;">
+        <div style="flex: 1; min-width: 200px; min-width: 160px;">
           <div style="font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
             \${productTitle}
           </div>

@@ -17,17 +17,38 @@ export async function loader({ request }) {
     return;
   }
   
-  // Configuration
-  const config = {
+  // Default configuration (will be overridden by settings)
+  let config = {
     formSelector: 'form[action^="/cart/add"]',
     buttonSelector: '[data-testid="add-to-cart-button"], .btn[data-action="add-to-cart"], button[name="add"], .product-form__cart-submit, .btn-product-form, .add-to-cart-button, .product-form--add-to-cart-button',
     offset: 100,
     position: 'bottom',
+    enabled: true,
     backgroundColor: '#000',
     textColor: '#fff',
     buttonText: 'Add to Cart',
     zIndex: 9999
   };
+  
+  // Fetch settings from API
+  async function loadSettings() {
+    try {
+      const response = await fetch('/api/settings?themeId=main');
+      const data = await response.json();
+      
+      if (data.settings) {
+        config = {
+          ...config,
+          enabled: data.settings.enabled,
+          position: data.settings.position,
+          offset: data.settings.offset
+        };
+        console.log('Smart Sticky: Settings loaded:', config);
+      }
+    } catch (error) {
+      console.warn('Smart Sticky: Failed to load settings, using defaults:', error);
+    }
+  }
   
   let originalForm = null;
   let originalButton = null;
@@ -210,7 +231,7 @@ export async function loader({ request }) {
   
   // Show/hide sticky bar
   function toggleStickyBar() {
-    if ((!originalButton && !originalForm) || !stickyBar) return;
+    if (!config.enabled || (!originalButton && !originalForm) || !stickyBar) return;
     
     const elementToCheck = originalButton || originalForm;
     const shouldShow = !isElementVisible(elementToCheck);
@@ -277,6 +298,12 @@ export async function loader({ request }) {
   
   // Initialize components
   function initializeComponents() {
+    // Skip if disabled
+    if (!config.enabled) {
+      console.log('Smart Sticky: Disabled in settings');
+      return false;
+    }
+    
     // Find the cart form and submit button
     const { form, button } = findCartForm();
     originalForm = form;
@@ -316,10 +343,19 @@ export async function loader({ request }) {
   }
   
   // Initialize
-  function init() {
+  async function init() {
     // Wait for DOM to be ready
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', init);
+      return;
+    }
+    
+    // Load settings first
+    await loadSettings();
+    
+    // Skip if disabled
+    if (!config.enabled) {
+      console.log('Smart Sticky: Disabled in settings, skipping initialization');
       return;
     }
     

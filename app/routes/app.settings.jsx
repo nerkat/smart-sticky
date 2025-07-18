@@ -100,12 +100,29 @@ export default function Settings() {
     );
   };
 
-  // Show success message
+  // Show success message and update form state after successful save
   useEffect(() => {
     if (fetcher.data?.success) {
       shopify.toast.show("Settings saved successfully!");
+      // Update form state to reflect the saved settings
+      if (fetcher.data.saved) {
+        setFormData({
+          enabled: fetcher.data.saved.enabled,
+          position: fetcher.data.saved.position,
+          offset: fetcher.data.saved.offset.toString(),
+        });
+      }
     }
   }, [fetcher.data, shopify]);
+
+  // Update form state when settings from loader change (e.g., on page reload)
+  useEffect(() => {
+    setFormData({
+      enabled: settings.enabled,
+      position: settings.position,
+      offset: settings.offset.toString(),
+    });
+  }, [settings]);
 
   // Position options
   const positionOptions = [

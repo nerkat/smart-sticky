@@ -1,5 +1,5 @@
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
   Page,
   Layout,
@@ -84,7 +84,6 @@ export default function Settings() {
     position: settings.position,
     offset: settings.offset.toString(),
   });
-  const hasSavedRef = useRef(false);
   
   const isLoading = fetcher.state !== "idle";
   const hasChanges = formData.enabled !== settings.enabled || 
@@ -104,38 +103,22 @@ export default function Settings() {
     );
   };
 
-  // Show success message and update form state from saved data
+  // Show success message when settings are saved
   useEffect(() => {
     if (fetcher.data?.success && fetcher.data?.saved) {
       shopify.toast.show("Settings saved successfully!");
       console.log("Settings saved:", fetcher.data.saved);
-      // Update form state from the saved data returned by the API
-      setFormData({
-        enabled: fetcher.data.saved.enabled,
-        position: fetcher.data.saved.position,
-        offset: fetcher.data.saved.offset.toString(),
-      });
-      hasSavedRef.current = true;
     }
   }, [fetcher.data, shopify]);
 
-  // Sync form state with loader data on initial load and page reload
+  // Sync form state with loader data (including after page reload)
   useEffect(() => {
     console.log("Syncing form state with loader data:", settings);
-    // Only sync if we haven't just saved
-    if (!hasSavedRef.current) {
-      setFormData({
-        enabled: settings.enabled,
-        position: settings.position,
-        offset: settings.offset.toString(),
-      });
-    }
-    // Reset the save flag after a short delay to allow for page reloads
-    const timer = setTimeout(() => {
-      hasSavedRef.current = false;
-    }, 1000);
-    
-    return () => clearTimeout(timer);
+    setFormData({
+      enabled: settings.enabled,
+      position: settings.position,
+      offset: settings.offset.toString(),
+    });
   }, [settings.enabled, settings.position, settings.offset]);
 
   // Position options

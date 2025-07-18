@@ -113,15 +113,6 @@ export default function Settings() {
     }
   }, [fetcher.data, shopify]);
 
-  // Update form state when settings from loader change (always sync with loader data)
-  useEffect(() => {
-    setFormData({
-      enabled: settings.enabled,
-      position: settings.position,
-      offset: settings.offset.toString(),
-    });
-  }, [settings]);
-
   // Position options
   const positionOptions = [
     { label: "Bottom of screen", value: "bottom" },

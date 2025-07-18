@@ -34,6 +34,9 @@ export const loader = async ({ request }) => {
   try {
     const { session } = await authenticate.admin(request);
     
+    console.log("Loader - Session:", session);
+    console.log("Loader - Session.shop:", session.shop);
+    
     // Get first theme as default (you might want to get the current theme)
     const defaultThemeId = "main";
     
@@ -75,6 +78,80 @@ export const loader = async ({ request }) => {
   }
 };
 
+export const action = async ({ request }) => {
+  try {
+    const { session } = await authenticate.admin(request);
+    
+    console.log("Action - Session:", session);
+    console.log("Action - Session.shop:", session.shop);
+    
+    // Handle form data from Remix fetcher
+    const formData = await request.formData();
+    const body = {
+      themeId: formData.get("themeId"),
+      enabled: formData.get("enabled") === "true",
+      position: formData.get("position"),
+      offset: Number(formData.get("offset")),
+    };
+    
+    const { themeId, enabled, position, offset } = body;
+    console.log("Action - Saving settings:", { themeId, enabled, position, offset, shop: session.shop });
+
+    if (!themeId) return json({ error: "Missing themeId" }, { status: 400 });
+
+    // Validate settings with defaults
+    const validatedSettings = {
+      enabled: enabled !== undefined ? enabled : DEFAULT_SETTINGS.enabled,
+      position: position || DEFAULT_SETTINGS.position,
+      offset: offset !== undefined ? offset : DEFAULT_SETTINGS.offset,
+    };
+
+    // Validate position values
+    if (!["top", "bottom"].includes(validatedSettings.position)) {
+      return json({ error: "Invalid position. Must be 'top' or 'bottom'" }, { status: 400 });
+    }
+
+    // Validate offset range
+    if (validatedSettings.offset < 0 || validatedSettings.offset > 500) {
+      return json({ error: "Invalid offset. Must be between 0 and 500" }, { status: 400 });
+    }
+
+    const saved = await prisma.stickySettings.upsert({
+      where: {
+        shop_themeId: {
+          shop: session.shop,
+          themeId,
+        },
+      },
+      update: validatedSettings,
+      create: {
+        shop: session.shop,
+        themeId,
+        ...validatedSettings,
+      },
+    });
+
+    console.log("Action - Settings saved to database:", saved);
+    
+    // Verify the settings were saved by reading them back
+    const verification = await prisma.stickySettings.findUnique({
+      where: {
+        shop_themeId: {
+          shop: session.shop,
+          themeId,
+        },
+      },
+    });
+    
+    console.log("Action - Verification read:", verification);
+    
+    return json({ success: true, saved });
+  } catch (error) {
+    console.error("Action - Error saving settings:", error);
+    return json({ error: error.message }, { status: 500 });
+  }
+};
+
 export default function Settings() {
   const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
@@ -99,7 +176,7 @@ export default function Settings() {
         position: formData.position,
         offset: parseInt(formData.offset),
       },
-      { method: "POST", action: "/api/settings" }
+      { method: "POST" }
     );
   };
 

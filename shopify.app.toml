@@ -3,7 +3,7 @@
 client_id = "664d98faa9f5f747da25aa32ef554211"
 name = "smart-sticky"
 handle = "smart-sticky"
-application_url = "https://strand-acres-herald-advised.trycloudflare.com"
+application_url = "https://adding-mississippi-gif-salon.trycloudflare.com"
 embedded = true
 
 [build]
@@ -26,7 +26,7 @@ api_version = "2025-07"
 scopes = "write_products,read_themes,write_script_tags"
 
 [auth]
-redirect_urls = ["https://strand-acres-herald-advised.trycloudflare.com/auth/callback", "https://strand-acres-herald-advised.trycloudflare.com/auth/shopify/callback", "https://strand-acres-herald-advised.trycloudflare.com/api/auth/callback"]
+redirect_urls = ["https://adding-mississippi-gif-salon.trycloudflare.com/auth/callback", "https://adding-mississippi-gif-salon.trycloudflare.com/auth/shopify/callback", "https://adding-mississippi-gif-salon.trycloudflare.com/api/auth/callback"]
 
 [pos]
 embedded = false

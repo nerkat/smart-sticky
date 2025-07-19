@@ -5,6 +5,8 @@
     "dev": "shopify app dev",
     "build": "remix vite:build",
     "deploy": "shopify app deploy",
+    "prisma:studio": "npx prisma studio",
+    "prisma:generate": "npx prisma generate",
     "generate": "shopify app generate",
     "config:link": "shopify app config link",
     "config:use": "shopify app config use",

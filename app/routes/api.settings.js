@@ -25,7 +25,7 @@ export async function loader({ request }) {
 
   try {
     // For development, use a mock session
-    const session = isDev ? { shop: "dev-shop.myshopify.com" } : (await getSession(request)).session;
+    const { session } = isDev ? { session: { shop: "dev-shop.myshopify.com" } } : await getSession(request);
     
     // Extract shop from referrer if not available in session
     let shop = session?.shop;
@@ -78,7 +78,7 @@ export async function options({ request }) {
 
 export async function action({ request }) {
   const isDev = process.env.NODE_ENV === "development";
-  const session = isDev ? { shop: "dev-shop.myshopify.com" } : (await getSession(request)).session;
+  const { session } = isDev ? { session: { shop: "dev-shop.myshopify.com" } } : await getSession(request);
   
   let body;
   const contentType = request.headers.get("content-type");

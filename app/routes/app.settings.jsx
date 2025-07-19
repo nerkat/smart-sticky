@@ -1,5 +1,5 @@
 import { useLoaderData, useFetcher } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Page,
   Layout,
@@ -34,8 +34,23 @@ export const loader = async ({ request }) => {
   try {
     const { session } = await authenticate.admin(request);
     
+    console.log("Loader - Session:", session);
+    console.log("Loader - Session.shop:", session.shop);
+    console.log("Loader - Session type:", typeof session.shop);
+    console.log("Loader - Session.shop length:", session.shop?.length);
+    
     // Get first theme as default (you might want to get the current theme)
     const defaultThemeId = "main";
+    
+    // Debug: Let's see what's actually in the database
+    const allSettings = await prisma.stickySettings.findMany({
+      where: {
+        shop: {
+          contains: session.shop?.split('.')[0] || ''
+        }
+      },
+    });
+    console.log("Loader - All settings for shop pattern:", allSettings);
     
     // Get settings for the default theme
     const settings = await prisma.stickySettings.findUnique({
@@ -55,10 +70,14 @@ export const loader = async ({ request }) => {
 
     return json({
       shop: session.shop,
-      settings: settings || {
+      settings: settings ? {
+        ...settings,
+        isFromDatabase: true,
+      } : {
         ...DEFAULT_SETTINGS,
         shop: session.shop,
         themeId: defaultThemeId,
+        isFromDatabase: false,
       },
       scriptTag,
       scriptTagInstalled: !!scriptTag,
@@ -75,20 +94,123 @@ export const loader = async ({ request }) => {
   }
 };
 
+export const action = async ({ request }) => {
+  try {
+    const { session } = await authenticate.admin(request);
+    
+    console.log("Action - Session:", session);
+    console.log("Action - Session.shop:", session.shop);
+    console.log("Action - Session type:", typeof session.shop);
+    console.log("Action - Session.shop length:", session.shop?.length);
+    
+    // Handle form data from Remix fetcher
+    const formData = await request.formData();
+    const body = {
+      themeId: formData.get("themeId"),
+      enabled: formData.get("enabled") === "true",
+      position: formData.get("position"),
+      offset: Number(formData.get("offset")),
+    };
+    
+    const { themeId, enabled, position, offset } = body;
+    console.log("Action - Saving settings:", { themeId, enabled, position, offset, shop: session.shop });
+
+    if (!themeId) return json({ error: "Missing themeId" }, { status: 400 });
+
+    // Validate settings with defaults
+    const validatedSettings = {
+      enabled: enabled !== undefined ? enabled : DEFAULT_SETTINGS.enabled,
+      position: position || DEFAULT_SETTINGS.position,
+      offset: offset !== undefined ? offset : DEFAULT_SETTINGS.offset,
+    };
+
+    // Validate position values
+    if (!["top", "bottom"].includes(validatedSettings.position)) {
+      return json({ error: "Invalid position. Must be 'top' or 'bottom'" }, { status: 400 });
+    }
+
+    // Validate offset range
+    if (validatedSettings.offset < 0 || validatedSettings.offset > 500) {
+      return json({ error: "Invalid offset. Must be between 0 and 500" }, { status: 400 });
+    }
+
+    const saved = await prisma.stickySettings.upsert({
+      where: {
+        shop_themeId: {
+          shop: session.shop,
+          themeId,
+        },
+      },
+      update: validatedSettings,
+      create: {
+        shop: session.shop,
+        themeId,
+        ...validatedSettings,
+      },
+    });
+
+    console.log("Action - Settings saved to database:", saved);
+    
+    // Verify the settings were saved by reading them back
+    const verification = await prisma.stickySettings.findUnique({
+      where: {
+        shop_themeId: {
+          shop: session.shop,
+          themeId,
+        },
+      },
+    });
+    
+    console.log("Action - Verification read:", verification);
+    
+    // Also check if we can find any settings for this shop
+    const allShopSettings = await prisma.stickySettings.findMany({
+      where: {
+        shop: session.shop,
+      },
+    });
+    console.log("Action - All settings for this shop:", allShopSettings);
+    
+    return json({ success: true, saved });
+  } catch (error) {
+    console.error("Action - Error saving settings:", error);
+    return json({ error: error.message }, { status: 500 });
+  }
+};
+
 export default function Settings() {
   const { shop, settings, scriptTagInstalled, error } = useLoaderData();
   const fetcher = useFetcher();
   const shopify = useAppBridge();
+  
+  // Debug log the settings received from loader
+  console.log("UI - Settings received from loader:", settings);
+  console.log("UI - Shop:", shop);
+  console.log("UI - Settings.isFromDatabase:", settings.isFromDatabase);
+  
   const [formData, setFormData] = useState({
     enabled: settings.enabled,
     position: settings.position,
     offset: settings.offset.toString(),
   });
   
+  // Debug log the initial form data
+  console.log("UI - Initial formData:", formData);
+  
   const isLoading = fetcher.state !== "idle";
   const hasChanges = formData.enabled !== settings.enabled || 
                     formData.position !== settings.position || 
                     parseInt(formData.offset) !== settings.offset;
+
+  // Create a stable reference to the settings for useEffect
+  const settingsForEffect = useMemo(() => ({
+    shop: settings.shop,
+    themeId: settings.themeId,
+    isFromDatabase: settings.isFromDatabase,
+    enabled: settings.enabled,
+    position: settings.position,
+    offset: settings.offset,
+  }), [settings.shop, settings.themeId, settings.isFromDatabase, settings.enabled, settings.position, settings.offset]);
 
   // Handle form submission
   const handleSave = () => {
@@ -99,7 +221,7 @@ export default function Settings() {
         position: formData.position,
         offset: parseInt(formData.offset),
       },
-      { method: "POST", action: "/api/settings" }
+      { method: "POST" }
     );
   };
 
@@ -120,13 +242,14 @@ export default function Settings() {
 
   // Initialize form state when loader data changes (only on mount/navigation)
   useEffect(() => {
-    console.log("Initializing form state with loader data:", settings);
+    console.log("Initializing form state with loader data:", settingsForEffect);
+    console.log("Settings are from database:", settingsForEffect.isFromDatabase);
     setFormData({
-      enabled: settings.enabled,
-      position: settings.position,
-      offset: settings.offset.toString(),
+      enabled: settingsForEffect.enabled,
+      position: settingsForEffect.position,
+      offset: settingsForEffect.offset.toString(),
     });
-  }, [settings.shop, settings.themeId]); // Only re-run when shop or themeId changes
+  }, [settingsForEffect]); // Re-run when relevant settings change
 
   // Position options
   const positionOptions = [
@@ -141,6 +264,18 @@ export default function Settings() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="500">
+            {/* Debug Banner */}
+            <Banner
+              title={settings.isFromDatabase ? "Settings loaded from database" : "Using default settings"}
+              tone={settings.isFromDatabase ? "success" : "info"}
+            >
+              <Text as="p">
+                {settings.isFromDatabase 
+                  ? "Your saved settings have been loaded successfully."
+                  : "No saved settings found. Using default values."}
+              </Text>
+            </Banner>
+            
             {/* Status Banner */}
             {!scriptTagInstalled && (
               <Banner
